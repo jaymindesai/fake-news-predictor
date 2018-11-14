@@ -1,16 +1,7 @@
 import pandas as pd
 import numpy as np
-from gensim.utils import simple_preprocess
 from gensim.models import Word2Vec
 # from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
-import string
-
-from nltk.corpus import stopwords
-from nltk import wordpunct_tokenize
-from nltk import WordNetLemmatizer
-from nltk import sent_tokenize
-from nltk import pos_tag
 
 from keras.utils import to_categorical
 from keras.layers import Dense
@@ -30,37 +21,7 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import recall_score
 from sklearn import metrics
 
-
-def tokenize(document):
-    lemmatizer = WordNetLemmatizer()
-
-    "Break the document into sentences"
-    for sent in sent_tokenize(document):
-
-        "Break the sentence into part of speech tagged tokens"
-        for token, tag in pos_tag(wordpunct_tokenize(sent)):
-
-            "Apply preprocessing to the token"
-            token = token.lower()  # Convert to lower case
-            token = token.strip()  # Strip whitespace and other punctuations
-            token = token.strip('_')  # remove _ if any
-            token = token.strip('*')  # remove * if any
-
-            "If stopword, ignore."
-            if token in stopwords.words('english'):
-                continue
-
-            "If punctuation, ignore."
-            if all(char in string.punctuation for char in token):
-                continue
-
-            "If number, ignore."
-            if token.isdigit():
-                continue
-
-            # Lemmatize the token and yield
-            lemma = lemmatizer.lemmatize(token)
-            yield lemma
+from src.utils.tokenizer import tokenize
 
 
 def to_sequence(statements, model):
@@ -148,11 +109,9 @@ if __name__ == '__main__':
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     model.fit(X_train, y_train_onehot, epochs=5, batch_size=100, verbose=1)
 
-    # predict_prob: predicted prob. of each class => [[0.1, 0.7, 0.1, 0.05, 0.05], [...]]
     predict_prob = model.predict(X_test)
     print(predict_prob)
 
-    # predict = index of class which have the max value.
     predict = np.argmax(predict_prob, axis=1)
 
     acc = accuracy_score(y_test, predict)
