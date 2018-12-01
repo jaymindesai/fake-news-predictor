@@ -1,0 +1,47 @@
+Multinomial NB
+
+
+TFIDF - SIX CLASS LABELS
+
+count    10.000000
+mean      0.239868
+std       0.012515
+min       0.216575
+25%       0.230441
+50%       0.244731
+75%       0.250147
+max       0.252351
+
+BOW - SIX CLASS LABELS
+
+count    10.000000
+mean      0.243460
+std       0.011593
+min       0.219703
+25%       0.235463
+50%       0.248143
+75%       0.250341
+max       0.256270
+
+
+TFIDF - TWO CLASS LABELS
+
+count    10.000000
+mean      0.605508
+std       0.010656
+min       0.592969
+25%       0.596211
+50%       0.602580
+75%       0.614828
+max       0.622066
+
+BOW - TWO CLASS LABELS
+
+count    10.000000
+mean      0.610433
+std       0.011610
+min       0.595313
+25%       0.603282
+50%       0.608679
+75%       0.618988
+max       0.627543
