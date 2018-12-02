@@ -95,7 +95,6 @@ if __name__ == '__main__':
     print('\t')
     X_prep, y_six, y_two = prep_data()
 
-    # TODO: Make changes below and run the file!
     # ...
     #
     # @Param: classifier => Any SciKit-Learn Classifier
