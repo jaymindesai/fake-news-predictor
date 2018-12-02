@@ -9,10 +9,9 @@ from sklearn.metrics import accuracy_score, recall_score, precision_score
 from src.utils.tokenizer import tokenize
 
 
-def nb_helper(classifier, n_folds, desc):
+def prep_data():
     train_data = pd.read_table('../../data/liar/train.tsv')[['label', 'statement']]
     test_data = pd.read_table('../../data/liar/test.tsv')[['label', 'statement']]
-
     data = pd.concat([train_data, test_data], ignore_index=True)
 
     X = data['statement']
@@ -30,13 +29,17 @@ def nb_helper(classifier, n_folds, desc):
 
     X_prep = pd.Series(prep)
 
+    return X_prep, y_six, y_two
+
+
+def nb_helper(X_prep, y_six, y_two, classifier, n_folds, desc):
     tfidf_vectorizer = TfidfVectorizer(lowercase=False)
     count_vectorizer = CountVectorizer(lowercase=False)
 
-    classify(X_prep, y_six, classifier, tfidf_vectorizer, n_folds, 6, desc + '_NB_TFiDF')
-    classify(X_prep, y_six, classifier, count_vectorizer, n_folds, 6, desc + '_NB_BoW')
-    classify(X_prep, y_two, classifier, tfidf_vectorizer, n_folds, 2, desc + '_NB_TFiDF')
-    classify(X_prep, y_two, classifier, count_vectorizer, n_folds, 2, desc + '_NB_BoW')
+    classify(X_prep, y_six, classifier, tfidf_vectorizer, n_folds, 6, desc + '_TFiDF')
+    classify(X_prep, y_six, classifier, count_vectorizer, n_folds, 6, desc + '_BoW')
+    classify(X_prep, y_two, classifier, tfidf_vectorizer, n_folds, 2, desc + '_TFiDF')
+    classify(X_prep, y_two, classifier, count_vectorizer, n_folds, 2, desc + '_BoW')
 
 
 def classify(X, y, clf, vec, n_folds, n_class, operation='_'):
@@ -55,8 +58,8 @@ def classify(X, y, clf, vec, n_folds, n_class, operation='_'):
         X_test = X[test_index]
         y_test = y[test_index]
 
-        X_train_vec = vec.fit_transform(X_train)
-        X_test_vec = vec.transform(X_test)
+        X_train_vec = vec.fit_transform(X_train).toarray()
+        X_test_vec = vec.transform(X_test).toarray()
 
         cloned_clf.fit(X_train_vec, y_train)
 
@@ -70,7 +73,7 @@ def classify(X, y, clf, vec, n_folds, n_class, operation='_'):
 
     print('{} Fold CV Results for {} with {} Class Labels:'.format(n_folds, operation, n_class))
     print('')
-    print(results)
+    print(results.describe())
     print('')
     print('-----')
     print('\t')
@@ -90,6 +93,16 @@ def print_vc(y):
 
 if __name__ == '__main__':
     print('\t')
-    folds = 5
-    # nb_helper(GaussianNB(), folds, desc='Gaussian')
-    nb_helper(MultinomialNB(), folds, desc='Multinomial')
+    X_prep, y_six, y_two = prep_data()
+
+    # TODO: Make changes below and run the file!
+    # ...
+    #
+    # @Param: classifier => Any SciKit-Learn Classifier
+    # @Param: n_folds => Number of Folds
+    # @Param: desc => Name of Classifier
+    #
+    # ...
+
+    nb_helper(X_prep, y_six, y_two, classifier=GaussianNB(), n_folds=10, desc='Gaussian_NB')
+    # nb_helper(X_prep, y_six, y_two, classifier=MultinomialNB(), n_folds=10, desc='Multinomial_NB')
