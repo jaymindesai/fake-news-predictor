@@ -18,8 +18,8 @@ def prep_data():
     y_six = data['label']
     y_two = data['label'].apply(lambda x: 'TRUE' if x in ['TRUE', 'mostly-true', 'half-true'] else 'FALSE')
 
-    print_vc(y_six)
-    print_vc(y_two)
+    _print_vc(y_six)
+    _print_vc(y_two)
 
     y_two = y_two.apply(lambda x: 0 if x is 'TRUE' else 1)
 
@@ -36,13 +36,13 @@ def nb_helper(X_prep, y_six, y_two, classifier, n_folds, desc):
     tfidf_vectorizer = TfidfVectorizer(lowercase=False)
     count_vectorizer = CountVectorizer(lowercase=False)
 
-    classify(X_prep, y_six, classifier, tfidf_vectorizer, n_folds, 6, desc + '_TFiDF')
-    classify(X_prep, y_six, classifier, count_vectorizer, n_folds, 6, desc + '_BoW')
-    classify(X_prep, y_two, classifier, tfidf_vectorizer, n_folds, 2, desc + '_TFiDF')
-    classify(X_prep, y_two, classifier, count_vectorizer, n_folds, 2, desc + '_BoW')
+    _classify(X_prep, y_six, classifier, tfidf_vectorizer, n_folds, 6, desc + '_TFiDF')
+    _classify(X_prep, y_six, classifier, count_vectorizer, n_folds, 6, desc + '_BoW')
+    _classify(X_prep, y_two, classifier, tfidf_vectorizer, n_folds, 2, desc + '_TFiDF')
+    _classify(X_prep, y_two, classifier, count_vectorizer, n_folds, 2, desc + '_BoW')
 
 
-def classify(X, y, clf, vec, n_folds, n_class, operation='_'):
+def _classify(X, y, clf, vec, n_folds, n_class, operation='_'):
     skfolds = StratifiedKFold(n_splits=n_folds, random_state=100)
 
     accuracy = []
@@ -79,7 +79,7 @@ def classify(X, y, clf, vec, n_folds, n_class, operation='_'):
     print('\t')
 
 
-def print_vc(y):
+def _print_vc(y):
     vc = y.value_counts()
     n_class = len(vc)
     print('{} Class Labels:'.format(n_class))
