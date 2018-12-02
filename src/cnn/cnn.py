@@ -1,181 +1,138 @@
-import string
-
-import tensorflow as tf
-import numpy as np
-from gensim.models import Word2Vec, word2vec
+import os
 import pandas as pd
-from keras.layers import Dense, Input, Flatten, Dropout, Concatenate
+from gensim import models
+from keras.preprocessing.text import Tokenizer
+from keras.preprocessing.sequence import pad_sequences
+from keras.utils import to_categorical
+import numpy as np
+from keras.layers import Dense, Input, GlobalMaxPooling1D
 from keras.layers import Conv1D, MaxPooling1D, Embedding
 from keras.models import Model
+from keras.layers import Input, Dense, Embedding, Conv2D, MaxPooling2D, Dropout,concatenate
+from keras.layers.core import Reshape, Flatten
 from keras.callbacks import EarlyStopping
-from keras.preprocessing.sequence import pad_sequences
-from nltk.corpus import stopwords
-from nltk import wordpunct_tokenize
-from nltk import WordNetLemmatizer
-from nltk import sent_tokenize
-from nltk import pos_tag
+from keras.optimizers import Adam
+from keras.models import Model
+from keras import regularizers
+import os
+from gensim.test.utils import datapath
+import gensim
+from gensim.models import Word2Vec
 from gensim.utils import simple_preprocess
-from keras.models import Sequential
+
+from gensim.models.keyedvectors import KeyedVectors
+
+word_vectors = KeyedVectors.load_word2vec_format('/home/shwetha/Downloads/GoogleNews-vectors-negative300.bin', binary=True)
 
 from sklearn.metrics import accuracy_score
 
-# TESTING DATA
-test_data = pd.read_table('../../data/liar/test.tsv')
-target_test = test_data['label']
-words_input_test = test_data['statement']
-
-# TRAINING DATA
-train_data = pd.read_table('../../data/liar/train.tsv')
-target_train = train_data['label']
-words_input_train = train_data['statement']
+#TESTING DATA
+tsv_file_test='test.tsv'
+csv_table_test=pd.read_table(tsv_file_test,sep='\t')
+target_test=csv_table_test['label']
+words_input_test=csv_table_test['statement']
 
 
-def preprocessing(input):
-    for index, row in input.iterrows():
-        yield simple_preprocess(row['statement'], min_len=2, max_len=15)
+#TRAINING DATA
+tsv_file_train='train.tsv'
+csv_table_train=pd.read_table(tsv_file_train,sep='\t')
+target_train=csv_table_train['label']
+words_input_train=csv_table_train['statement']
+
+category=csv_table_train.label.unique()
+dic={}
+for i,label in enumerate(category):
+    dic[label]=i
+labels=csv_table_train.label.apply(lambda x:dic[x])
+
+val_data=csv_table_train.sample(frac=0.2,random_state=200)
+train_data=csv_table_train.drop(val_data.index)
+
+texts=train_data.statement
 
 
-def tokenize(document):
-    lemmatizer = WordNetLemmatizer()
+NUM_WORDS=20000
+tokenizer = Tokenizer(num_words=NUM_WORDS,filters='!"#$%&()*+,-./:;<=>?@[\\]^_`{|}~\t\n\'',
+                      lower=True)
+tokenizer.fit_on_texts(texts)
+sequences_train = tokenizer.texts_to_sequences(texts)
+sequences_valid=tokenizer.texts_to_sequences(val_data.statement)
+word_index = tokenizer.word_index
 
-    "Break the document into sentences"
-    for sent in sent_tokenize(document):
+X_train = pad_sequences(sequences_train)
+X_val = pad_sequences(sequences_valid,maxlen=X_train.shape[1])
+y_train = to_categorical(np.asarray(labels[train_data.index]))
+y_val = to_categorical(np.asarray(labels[val_data.index]))
 
-        "Break the sentence into part of speech tagged tokens"
-        for token, tag in pos_tag(wordpunct_tokenize(sent)):
+EMBEDDING_DIM=300
+vocabulary_size=min(len(word_index)+1,NUM_WORDS)
+embedding_matrix = np.zeros((vocabulary_size, EMBEDDING_DIM))
+for word, i in word_index.items():
+    if i>=NUM_WORDS:
+        continue
+    try:
+        embedding_vector = word_vectors[word]
+        embedding_matrix[i] = embedding_vector
+    except KeyError:
+        embedding_matrix[i]=np.random.normal(0,np.sqrt(0.25),EMBEDDING_DIM)
 
-            "Apply preprocessing to the token"
-            token = token.lower()  # Convert to lower case
-            token = token.strip()  # Strip whitespace and other punctuations
-            token = token.strip('_')  # remove _ if any
-            token = token.strip('*')  # remove * if any
+del(word_vectors)
 
-            "If stopword, ignore."
-            if token in stopwords.words('english'):
-                continue
-
-            "If punctuation, ignore."
-            if all(char in string.punctuation for char in token):
-                continue
-
-            "If number, ignore."
-            if token.isdigit():
-                continue
-
-            # Lemmatize the token and yield
-            lemma = lemmatizer.lemmatize(token)
-            yield lemma
-
-
-doc_train = list(preprocessing(pd.DataFrame(words_input_train)))
-doc_test = list(preprocessing(pd.DataFrame(words_input_test)))
+from keras.layers import Embedding
+embedding_layer = Embedding(vocabulary_size,
+                            EMBEDDING_DIM,
+                            weights=[embedding_matrix],
+                            trainable=True)
 
 
-def to_sequence(statements, model):
-    index2word_set = set(model.wv.index2word)
-    sequences = []
+sequence_length = X_train.shape[1]
+filter_sizes = [3,4,5]
+num_filters = 100
+drop = 0.5
+# Just disables the warning, doesn't enable AVX/FMA
 
-    for statement in statements:
-        # print(statement)
-        # print("len(statement)=",len(statement))
-        seq = []
-
-        for i in range(len(statement)):
-            word = statement[i]
-            # print("{}th iter - word = {}".format(i,word))
-
-            if word in index2word_set:
-                wordvec = model[word].tolist()
-                seq.append(wordvec)
-            else:
-                print(word, "is not in the dictionary")
-
-        sequences.append(seq)
-
-    return sequences
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
-# doc_train =list(tokenize(words_input_train))
-# doc_test = list(tokenize(words_input_test))
+inputs = Input(shape=(sequence_length,))
+embedding = embedding_layer(inputs)
+reshape = Reshape((sequence_length,EMBEDDING_DIM,1))(embedding)
 
-model = Word2Vec.load('word2vec')
-seq_train = to_sequence(doc_train, model)
-seq_test = to_sequence(doc_test, model)
+conv_0 = Conv2D(num_filters, (filter_sizes[0], EMBEDDING_DIM),activation='relu',kernel_regularizer=regularizers.l2(0.01))(reshape)
+conv_1 = Conv2D(num_filters, (filter_sizes[1], EMBEDDING_DIM),activation='relu',kernel_regularizer=regularizers.l2(0.01))(reshape)
+conv_2 = Conv2D(num_filters, (filter_sizes[2], EMBEDDING_DIM),activation='relu',kernel_regularizer=regularizers.l2(0.01))(reshape)
 
-EMBEDDING_DIM = 150  # how big is each word vector
-MAX_VOCAB_SIZE = 17000  # how many unique words to use (i.e num rows in embedding vector)
-MAX_SEQUENCE_LENGTH = 11  # max number of words in a comment to use
+maxpool_0 = MaxPooling2D((sequence_length - filter_sizes[0] + 1, 1), strides=(1,1))(conv_0)
+maxpool_1 = MaxPooling2D((sequence_length - filter_sizes[1] + 1, 1), strides=(1,1))(conv_1)
+maxpool_2 = MaxPooling2D((sequence_length - filter_sizes[2] + 1, 1), strides=(1,1))(conv_2)
 
-# training params
-batch_size = 256
-num_epochs = 2
+merged_tensor = concatenate([maxpool_0, maxpool_1, maxpool_2], axis=1)
+flatten = Flatten()(merged_tensor)
+reshape = Reshape((3*num_filters,))(flatten)
+dropout = Dropout(drop)(flatten)
+output = Dense(units=6, activation='softmax',kernel_regularizer=regularizers.l2(0.01))(dropout)
 
-train_cnn_data = pad_sequences(seq_train, maxlen=15, dtype='float32', value=0.0)
-test_cnn_data = pad_sequences(seq_test, maxlen=15, dtype='float32', value=0.0)
-y_train = test_cnn_data
+# this creates a model that includes
+model = Model(inputs, output)
 
-train_embedding_weights = np.zeros((len(seq_train) + 1, EMBEDDING_DIM))
-for word, index in words_input_train:
-    train_embedding_weights[index, :] = word2vec[word] if word in word2vec else np.random.rand(EMBEDDING_DIM)
+adam = Adam(lr=1e-6)
 
-test_cnn_data = pad_sequences(seq_test, maxlen=MAX_SEQUENCE_LENGTH)
-
-
-def ConvNet(embeddings, max_sequence_length, num_words, embedding_dim, labels_index, trainable=False, extra_conv=True):
-    embedding_layer = Embedding(num_words,
-                                embedding_dim,
-                                weights=[embeddings],
-                                input_length=max_sequence_length,
-                                trainable=trainable)
-
-    sequence_input = Input(shape=(max_sequence_length,), dtype='int32')
-    embedded_sequences = embedding_layer(sequence_input)
-
-    convs = []
-    filter_sizes = [3, 4, 5]
-
-    for filter_size in filter_sizes:
-        l_conv = Conv1D(filters=128, kernel_size=filter_size, activation='relu')(embedded_sequences)
-        l_pool = MaxPooling1D(pool_size=3)(l_conv)
-        convs.append(l_pool)
-
-    l_merge = Concatenate(mode='concat', concat_axis=1)(convs)
-
-    conv = Conv1D(filters=128, kernel_size=3, activation='relu')(embedded_sequences)
-    pool = MaxPooling1D(pool_size=3)(conv)
-
-    if extra_conv == True:
-        x = Dropout(0.5)(l_merge)
-    else:
-
-        x = Dropout(0.5)(pool)
-    x = Flatten()(x)
-    x = Dense(128, activation='relu')(x)
-    x = Dropout(0.5)(x)
-    # Finally, we feed the output into a Sigmoid layer.
-    # The reason why sigmoid is used is because we are trying to achieve a binary classification(1,0)
-    # for each of the 6 labels, and the sigmoid function will squash the output between the bounds of 0 and 1.
-    preds = Dense(labels_index, activation='sigmoid')(x)
-
-    model = Model(sequence_input, preds)
-    model.compile(loss='binary_crossentropy',
-                  optimizer='adam',
-                  metrics=['acc'])
-    model.summary()
-    return model
+model.compile(loss='categorical_crossentropy',
+              optimizer=adam,
+              metrics=['acc'])
+callbacks = [EarlyStopping(monitor='val_loss')]
+model.fit(X_train, y_train, batch_size=1000, epochs=5, verbose=1, validation_data=(X_val, y_val),
+         callbacks=callbacks)
+sequences_test=tokenizer.texts_to_sequences(csv_table_test.statement)
+X_test = pad_sequences(sequences_test,maxlen=X_train.shape[1])
+y_pred=model.predict(X_test)
 
 
-x_train = train_cnn_data
-y_tr = y_train
 
-# replace with word2vec
-model = ConvNet(train_embedding_weights, MAX_SEQUENCE_LENGTH, len(seq_train) + 1, EMBEDDING_DIM,
-                len(list(target_train)), False)
-
-early_stopping = EarlyStopping(monitor='val_loss', min_delta=0.01, patience=4, verbose=1)
-callbacks_list = [early_stopping]
-
-hist = model.fit(x_train, y_tr, epochs=num_epochs, callbacks=callbacks_list, validation_split=0.1, shuffle=True,
-                 batch_size=batch_size)
-y_test = model.predict(test_cnn_data, batch_size=1024, verbose=1)
-print(accuracy_score(y_test, target_test))
+to_submit=pd.DataFrame(index=csv_table_test.id,data={'FALSE':y_pred[:,dic['FALSE']],
+                                                'TRUE':y_pred[:,dic['TRUE']],
+                                                'half-true':y_pred[:,dic['half-true']],
+                                                'barely-true': y_pred[:, dic['barely-true']],
+                                                 'pants-fire': y_pred[:, dic['pants-fire']],
+                                                     'mostly-true': y_pred[:, dic['mostly-true']]})
+to_submit.to_csv('submit.csv')
