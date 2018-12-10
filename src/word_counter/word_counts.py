@@ -12,15 +12,15 @@ def count_words():
     true_counts = Counter()
 
     for _, row in data.iterrows():
-        # print(row)
+        print(row)
         tokens = [t for t in tokenize(row['statement'])]
         if row['label'] in ['TRUE', 'mostly-true', 'half-true']:
             true_counts.update(tokens)
         else:
             fake_counts.update(tokens)
 
-    print('True', true_counts.most_common(10))
-    print('Fake', fake_counts.most_common(10))
+    # print('True', true_counts.most_common(10))
+    # print('Fake', fake_counts.most_common(10))
 
     true_words = set()
     fake_words = set()
@@ -35,8 +35,10 @@ def count_words():
             fake_words.add(word)
             file.write('{}: {}\n'.format(word, freq))
 
+    diff = list(fake_words - true_words)
+    
     with open('true_fake_diff.txt', 'w') as file:
-        for word in fake_words - true_words:
+        for word in sorted(diff, key=lambda x: fake_counts[x], reverse=True):
             file.write('{}: {}\n'.format(word, fake_counts[word]))
 
 
