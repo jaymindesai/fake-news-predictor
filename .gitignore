@@ -168,3 +168,8 @@ fabric.properties
 
 # Editor-based Rest Client
 .idea/httpRequests
+
+*.idea
+.idea/
+.DS_Store
+src/.DS_Store
